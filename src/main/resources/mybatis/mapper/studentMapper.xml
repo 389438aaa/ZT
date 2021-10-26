@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "mybatis-3-mapper.dtd">
+<mapper namespace="com.zt.newdemo.dao.StudentDao">
+    <!-- 根据学生姓名查询学生的信息以及科目成绩  -->
+    <resultMap id="studentMap" type="com.zt.newdemo.domain.Student">
+        <id property="sid" column="sid"/>
+        <result property="sname" column="sname"/>
+        <result property="address" column="address"/>
+        <result property="sex" column="sex" />
+        <result property="age" column="age"/>
+        <result property="class_id" column="class_id"/>
+        <result property="class_name" column="class_name"/>
+        <collection property="grades" javaType="java.util.ArrayList" ofType="com.zt.newdemo.domain.Grade" select="selectGradesInStudent" column="{next_sid=sid}">
+        </collection>
+    </resultMap>
+    <resultMap id="gradeMap" type="com.zt.newdemo.domain.Grade">
+        <id property="g_sid" column="g_sid"/>
+        <id property="g_cid" column="g_cid"/>
+        <result property="grades" column="grades"/>
+        <association property="course" javaType="com.zt.newdemo.domain.Course">
+            <id property="cid" column="cid"/>
+            <result property="cname" column="cname"/>
+        </association>
+    </resultMap>
+    <select id="selectGradeByStudentName" resultMap="studentMap" >
+        select s.sname,s.age,s.sex,s.class_id,s.address,s.sid,cl.class_name from student s
+        join class cl on cl.class_id=s.class_id
+        <if test="student.sname !=null">
+            where s.sname like concat('%',#{student.sname},'%')
+        </if>
+    </select>
+    <select id="selectGradesInStudent" resultMap="gradeMap">
+        select g.g_sid,g.g_cid,g.grades,c.cname,c.cid
+        from grade g
+        join course c
+        on c.cid=g.g_cid
+        where g.g_sid=#{next_sid}
+            <if test="cname !=null and cname !=''">
+                and cname like concat('%',#{cname},'%')
+            </if>
+    </select>
+    <!--根据班级名，学生名，科目名 查询学生成绩及科目信息!!!-->
+    <select id="selectGradeBy" resultMap="studentMap">
+        select s.sname,s.age,s.address,s.sex,s.class_id,cl.class_name
+        from student s
+        join class cl
+        on cl.class_id=s.class_id
+        <where>
+            <if test="sname !=null and sname!=''">
+                s.sname like concat('%',#{sname},'%')
+            </if>
+            <if test="class_name !=null and class_name !=''">
+                and cl.class_name like concat('%',#{class_name},'%')
+            </if>
+        </where>
+    </select>
+
+
+    <!--根据学生id查询学生信息-->
+   <select id="selectStudentById" resultType="com.zt.newdemo.domain.Student">
+       select * from student s where s.sid=#{sid}
+   </select>
+    <!--新增学生-->
+    <insert id="insertStudent" useGeneratedKeys="true" keyProperty="sid">
+        insert into
+        student(sname,age,sex,address,class_id)
+         values
+        (#{student.sname},#{student.age},#{student.sex},#{student.address},#{student.class_id})
+    </insert>
+   <!--根据id删除学生信息-->
+    <delete id="deleteStudentById" >
+        delete  from  student WHERE sid =#{sid}
+    </delete>
+    <!--根据id更新学生信息-->
+    <update id="updateStudentById">
+        update student s
+         set
+        s.sname=#{student.sname},
+        s.age=#{student.age},
+        s.sex=#{student.sex},
+        s.address=#{student.address}
+        where s.sid=#{student.sid}
+    </update>
+    <!--Student单表分页-->
+    <select id="selectStudentLimit" resultType="com.zt.newdemo.domain.Student">
+        select sid,sname,age,sex,address,class_id from student limit #{pageStart},#{pageSize}
+    </select>
+    <!--Student,Class 双表关联查询分页-->
+    <resultMap id="studentAndClassMap" type="com.zt.newdemo.domain.extend.StudentExtend">
+            <id column="sid" property="sid"/>
+        <result property="address" column="address"/>
+        <result property="sex" column="sex"/>
+        <result property="age" column="age"/>
+        <result property="class_id" column="class_id"/>
+        <result property="sname" column="sname"/>
+        <association property="aClass" javaType="com.zt.newdemo.domain.Class" >
+            <id column="class_id" property="class_id" />
+            <result property="class_name" column="class_name"/>
+        </association>
+    </resultMap>
+    <select id="selectStudentByClassNameLimit" resultMap="studentAndClassMap">
+        select s.sname,s.age,s.address,s.sid,s.sex,s.class_id,cl.class_name,cl.class_id
+        from student s join class cl
+        on cl.class_id=s.class_id
+        where cl.class_id=#{class_id}
+        limit #{pageStart},#{pageSize}
+    </select>
+    <!--student批量添加 -->
+    <insert id="insertStudentList" useGeneratedKeys="true" keyProperty="sid">
+        insert into student(sname,age,sex,address,class_id) values
+        <foreach collection="studentList" item="student" separator=",">
+            (#{student.sname},#{student.age},#{student.sex},#{student.address},#{student.class_id})
+        </foreach>
+    </insert>
+    <!--student批量删除 根据id-->
+    <delete id="com.zt.newdemo.dao.StudentDao.deleteStudentsByIds" parameterType="int[]">
+        delete from student  where
+        <if test="ids ==null">
+            sid==null
+        </if>
+        <if test="ids !=null" >
+            sid in
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+              #{id}
+            </foreach>
+        </if>
+    </delete>
+  <!--  &lt;!&ndash;student批量更新 根据id foreach 必须在mysql连接加上 &allowMultiQueries=true&ndash;&gt;
+  <update id="updateStudentsById">
+         <foreach collection="students" item="student" >
+             update student
+             <set>
+             <if test="student.sname !=null">sname=#{student.sname},</if>
+             <if test="student.age !=null">age=#{student.age},</if>
+             <if test="student.sex !=null">sex=#{student.sex},</if>
+             <if test="student.address !=null"> address=#{student.address},</if>
+             <if test="student.class_id !=null"> class_id=#{student.class_id},</if>
+            </set>
+             where sid=#{student.sid};
+         </foreach>
+    </update>-->
+
+    <!--student批量更新 根据id case when-->
+    <update id="updateStudentsById">
+        update student_copy
+        set sname=
+         case sid
+        <foreach collection="students" item="student">
+            when #{student.sid} then #{student.sname}
+        </foreach>
+         end,
+
+        age=
+        case sid
+        <foreach collection="students" item="student">
+            when #{student.sid} then #{student.age}
+         </foreach>
+        end,
+
+        address=
+        case sid
+          <foreach collection="students" item="student" >
+              when #{student.sid} then #{student.address}
+          </foreach>
+        end,
+
+         class_id=
+         case sid
+           <foreach collection="students" item="student">
+               when #{student.sid} then #{student.class_id}
+           </foreach>
+        end
+
+        where sid in
+        <foreach collection="students" item="student" separator="," open="(" close=")">
+            #{student.sid}
+        </foreach>
+     </update>
+</mapper>
